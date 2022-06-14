@@ -33,6 +33,7 @@ def evaluate(**kwargs):
     if kwargs['timestamp'] == 'latest':
         if os.path.exists(os.path.join('../', kwargs['exps_folder_name'], expname)):
             timestamps = os.listdir(os.path.join('../', kwargs['exps_folder_name'], expname))
+            print(timestamps)
             if (len(timestamps)) == 0:
                 print('WRONG EXP FOLDER')
                 exit()
@@ -92,7 +93,7 @@ def evaluate(**kwargs):
 
     with torch.no_grad():
 
-        if scan_id < 24: # Blended MVS
+        if scan_id < 24 or scan_id > 600: # Blended MVS or sacnnet
             mesh = plt.get_surface_high_res_mesh(
                 sdf=lambda x: model.implicit_network(x)[:, 0],
                 resolution=kwargs['resolution'],

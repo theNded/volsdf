@@ -132,6 +132,7 @@ exps*
 evals*
 data/DTU
 data/BlendedMVS
+data/scannet
 
 code/.idea/
 .DS_Store
