@@ -38,6 +38,7 @@ class SceneDataset(torch.utils.data.Dataset):
             P = world_mat @ scale_mat
             P = P[:3, :4]
             intrinsics, pose = rend_util.load_K_Rt_from_P(None, P)
+            print(intrinsics)
             self.intrinsics_all.append(torch.from_numpy(intrinsics).float())
             self.pose_all.append(torch.from_numpy(pose).float())
 
