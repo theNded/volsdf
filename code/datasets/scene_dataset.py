@@ -1,19 +1,23 @@
 import os
 import torch
 import numpy as np
-
+import glob
+import cv2
 import utils.general as utils
 from utils import rend_util
 
+
 class SceneDataset(torch.utils.data.Dataset):
 
-    def __init__(self,
-                 data_dir,
-                 img_res,
-                 scan_id=0,
-                 ):
+    def __init__(
+        self,
+        data_dir,
+        img_res,
+        scan_id=0,
+    ):
 
-        self.instance_dir = os.path.join('../data', data_dir, 'scan{0}'.format(scan_id))
+        self.instance_dir = os.path.join('../data', data_dir,
+                                         'scan{0}'.format(scan_id))
         print(self.instance_dir)
 
         self.total_pixels = img_res[0] * img_res[1]
@@ -25,12 +29,27 @@ class SceneDataset(torch.utils.data.Dataset):
 
         image_dir = '{0}/image'.format(self.instance_dir)
         image_paths = sorted(utils.glob_imgs(image_dir))
+
+        depth_dir = '{0}/depth'.format(self.instance_dir)
+        depth_paths = sorted(glob.glob(os.path.join(depth_dir, '*.pfm')))
+
+        normal_dir = '{0}/normal'.format(self.instance_dir)
+        normal_paths = sorted(glob.glob(os.path.join(normal_dir, '*.npy')))
+
         self.n_images = len(image_paths)
+        assert (len(normal_paths) == self.n_images)
+        assert (len(depth_paths) == self.n_images)
 
         self.cam_file = '{0}/cameras.npz'.format(self.instance_dir)
         camera_dict = np.load(self.cam_file)
-        scale_mats = [camera_dict['scale_mat_%d' % idx].astype(np.float32) for idx in range(self.n_images)]
-        world_mats = [camera_dict['world_mat_%d' % idx].astype(np.float32) for idx in range(self.n_images)]
+        scale_mats = [
+            camera_dict['scale_mat_%d' % idx].astype(np.float32)
+            for idx in range(self.n_images)
+        ]
+        world_mats = [
+            camera_dict['world_mat_%d' % idx].astype(np.float32)
+            for idx in range(self.n_images)
+        ]
 
         self.intrinsics_all = []
         self.pose_all = []
@@ -48,6 +67,27 @@ class SceneDataset(torch.utils.data.Dataset):
             rgb = rgb.reshape(3, -1).transpose(1, 0)
             self.rgb_images.append(torch.from_numpy(rgb).float())
 
+        self.depth_images = []
+        for path in depth_paths:
+            depth = cv2.imread(path, -1)
+            depth = depth.flatten().astype(np.float32)
+            self.depth_images.append(
+                torch.from_numpy(depth).float().unsqueeze(-1))
+
+        self.normal_images = []
+        for i, path in enumerate(normal_paths):
+            normal = np.load(path)
+            normal = normal.reshape(3, -1).transpose(1, 0)
+            normal = (normal - 0.5) * 2
+            normal_norm = np.linalg.norm(normal, axis=1, keepdims=True)
+            normal = normal / normal_norm
+
+            # Camera to world
+            R = self.pose_all[i][:3, :3].numpy()
+            normal = normal @ R.T
+
+            self.normal_images.append(torch.from_numpy(normal).float())
+
     def __len__(self):
         return self.n_images
 
@@ -63,11 +103,16 @@ class SceneDataset(torch.utils.data.Dataset):
         }
 
         ground_truth = {
-            "rgb": self.rgb_images[idx]
+            "rgb": self.rgb_images[idx],
+            "depth": self.depth_images[idx],
+            "normal": self.normal_images[idx]
         }
 
         if self.sampling_idx is not None:
             ground_truth["rgb"] = self.rgb_images[idx][self.sampling_idx, :]
+            ground_truth["depth"] = self.depth_images[idx][self.sampling_idx]
+            ground_truth["normal"] = self.normal_images[idx][
+                self.sampling_idx, :]
             sample["uv"] = uv[self.sampling_idx, :]
 
         return idx, sample, ground_truth
@@ -93,7 +138,8 @@ class SceneDataset(torch.utils.data.Dataset):
         if sampling_size == -1:
             self.sampling_idx = None
         else:
-            self.sampling_idx = torch.randperm(self.total_pixels)[:sampling_size]
+            self.sampling_idx = torch.randperm(
+                self.total_pixels)[:sampling_size]
 
     def get_scale_mat(self):
         return np.load(self.cam_file)['scale_mat_0']
