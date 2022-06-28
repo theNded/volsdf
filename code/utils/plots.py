@@ -37,23 +37,8 @@ def plot(implicit_network,
                     epoch, plot_nimgs, img_res, 'normal')
 
         # Plot depth maps
-        print('depth', plot_data['depth_eval'].shape,
-              plot_data['depth_gt'].shape)
-
-        cmap = matplotlib.cm.get_cmap('turbo')
-
-        norm = matplotlib.colors.Normalize(vmin=plot_data['depth_eval'].min(),
-                                           vmax=plot_data['depth_eval'].max())
-        depth_eval = cmap(norm(plot_data['depth_eval'].detach().cpu().numpy()))
-        depth_eval = torch.from_numpy(depth_eval).squeeze(2).cuda()
-
-        norm = matplotlib.colors.Normalize(vmin=plot_data['depth_gt'].min(),
-                                           vmax=plot_data['depth_gt'].max())
-        depth_gt = cmap(norm(plot_data['depth_gt'].detach().cpu().numpy()))
-        depth_gt = torch.from_numpy(depth_gt).squeeze(2).cuda()
-
-        plot_images(depth_eval, depth_gt, path, epoch, plot_nimgs, img_res,
-                    'depth')
+        plot_images(plot_data['depth_eval'], plot_data['depth_gt'], path,
+                    epoch, plot_nimgs, img_res, 'depth')
 
     data = []
 
@@ -489,20 +474,40 @@ def get_grid(points, resolution, input_min=None, input_max=None, eps=0.1):
     }
 
 
-def plot_images(rgb_points, ground_true, path, epoch, plot_nrow, img_res,
-                prefix):
-    ground_true = ground_true.cuda()
+def plot_images(pred, gt, path, epoch, plot_nrow, img_res, prefix):
+    gt = gt.cuda()
 
-    output_vs_gt = torch.cat((rgb_points, ground_true), dim=0)
-    output_vs_gt_plot = lin2img(output_vs_gt, img_res)
+    if prefix == 'depth':
+        cmap = matplotlib.cm.get_cmap('turbo')
+        scales = pred / gt
+        mask = torch.isfinite(scales)
+        median_scale = torch.median(scales[mask])
+        gt *= median_scale
+
+        diff = torch.abs(pred - gt)
+
+        norm = matplotlib.colors.Normalize(vmin=0, vmax=pred.max())
+        pred = cmap(norm(pred.detach().cpu().numpy()))
+        pred = torch.from_numpy(pred).squeeze(2).cuda()
+
+        gt = cmap(norm(gt.detach().cpu().numpy()))
+        gt = torch.from_numpy(gt).squeeze(2).cuda()
+
+        norm = matplotlib.colors.Normalize(vmin=0, vmax=diff.max())
+        diff = cmap(norm(diff.detach().cpu().numpy()))
+        diff = torch.from_numpy(diff).squeeze(2).cuda()
+    else:
+        diff = torch.abs(pred - gt)
+
+    canvas = torch.cat((pred, gt, diff), dim=0)
+    canvas = lin2img(canvas, img_res)
 
     tensor = torchvision.utils.make_grid(
-        output_vs_gt_plot, scale_each=False, normalize=False,
+        canvas, scale_each=False, normalize=False,
         nrow=plot_nrow).cpu().detach().numpy()
-
     tensor = tensor.transpose(1, 2, 0)
-    scale_factor = 255
-    tensor = (tensor * scale_factor).astype(np.uint8)
+
+    tensor = (tensor * 255.0).astype(np.uint8)
 
     img = Image.fromarray(tensor)
     img.save('{0}/{1}_{2}.png'.format(path, prefix, epoch))

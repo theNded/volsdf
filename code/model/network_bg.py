@@ -125,7 +125,8 @@ class VolSDFNetworkBG(nn.Module):
             'rgb_values': rgb_values,
             # TODO: check how bg is incorporated
             'depth_values': fg_depth_values.unsqueeze(-1),
-            'normal_values': fg_normal_values
+            'normal_values': fg_normal_values,
+            'bg_weight': bg_transmittance
         }
 
         if self.training:

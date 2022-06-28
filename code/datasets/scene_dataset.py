@@ -57,7 +57,7 @@ class SceneDataset(torch.utils.data.Dataset):
             P = world_mat @ scale_mat
             P = P[:3, :4]
             intrinsics, pose = rend_util.load_K_Rt_from_P(None, P)
-            print(intrinsics)
+            # print(intrinsics)
             self.intrinsics_all.append(torch.from_numpy(intrinsics).float())
             self.pose_all.append(torch.from_numpy(pose).float())
 
@@ -85,6 +85,10 @@ class SceneDataset(torch.utils.data.Dataset):
             # Camera to world
             R = self.pose_all[i][:3, :3].numpy()
             normal = normal @ R.T
+
+            # import matplotlib.pyplot as plt
+            # plt.imshow(np.abs(normal.reshape((384, 384, 3))))
+            # plt.show()
 
             self.normal_images.append(torch.from_numpy(normal).float())
 

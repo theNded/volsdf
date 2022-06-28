@@ -8,8 +8,8 @@ class VolSDFLoss(nn.Module):
     def __init__(self,
                  rgb_loss,
                  eikonal_weight,
-                 depth_weight=0.0,
-                 normal_weight=0.00):
+                 depth_weight=0.1,
+                 normal_weight=0.0):
         super().__init__()
         self.eikonal_weight = eikonal_weight
         self.depth_weight = depth_weight
@@ -23,11 +23,16 @@ class VolSDFLoss(nn.Module):
         return rgb_loss
 
     def get_depth_loss(self, depth_values, depth_gt):
-        return (depth_values - depth_gt).mean()
+        with torch.no_grad():
+            scales = (depth_values / depth_gt)
+            mask = torch.isfinite(scales)
+            scale = scales[mask].median()
+        return ((depth_values - depth_gt * scale)**2).mean(), scale
 
     def get_normal_loss(self, normal_values, normal_gt):
-        l1_loss = torch.abs(normal_values - normal_gt).mean()
-        dot_loss = torch.abs(1 - (normal_values * normal_gt).sum(dim=1)).mean()
+        l1_loss = (torch.abs(normal_values - normal_gt)).mean()
+        dot_loss = torch.abs(
+            (1 - (normal_values * normal_gt).sum(dim=1))).mean()
         return l1_loss + dot_loss
 
     def get_eikonal_loss(self, grad_theta):
@@ -40,8 +45,8 @@ class VolSDFLoss(nn.Module):
         normal_gt = ground_truth['normal'].cuda()
 
         rgb_loss = self.get_rgb_loss(model_outputs['rgb_values'], rgb_gt)
-        depth_loss = self.get_depth_loss(model_outputs['depth_values'],
-                                         depth_gt)
+        depth_loss, scale = self.get_depth_loss(model_outputs['depth_values'],
+                                                depth_gt)
         normal_loss = self.get_normal_loss(model_outputs['normal_values'],
                                            normal_gt)
 
@@ -61,6 +66,7 @@ class VolSDFLoss(nn.Module):
             'depth_loss': depth_loss,
             'normal_loss': normal_loss,
             'eikonal_loss': eikonal_loss,
+            'depth_scale': scale
         }
 
         return output

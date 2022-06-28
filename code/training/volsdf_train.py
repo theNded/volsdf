@@ -236,9 +236,12 @@ class VolSDFTrainRunner():
                     d = {
                         'rgb_values': out['rgb_values'].detach(),
                         'depth_values': out['depth_values'].detach(),
-                        'normal_values': out['normal_values'].detach()
+                        'normal_values': out['normal_values'].detach(),
                     }
                     res.append(d)
+
+                    # Use this to free the graph(?)
+                    out['depth_values'].sum().backward()
 
                 batch_size = ground_truth['rgb'].shape[0]
                 model_outputs = utils.merge_output(res, self.total_pixels,
@@ -275,12 +278,13 @@ class VolSDFTrainRunner():
                     model_outputs['rgb_values'],
                     ground_truth['rgb'].cuda().reshape(-1, 3))
                 print(
-                    '{0}_{1} [{2}] ({3}/{4}): loss = {5:.3f}, rgb_loss = {6:.3f}, eikonal_loss = {7:.3f}, normal_loss = {8:.3f}, psnr = {9:.3f}'
+                    '{0}_{1} [{2}] ({3}/{4}): loss = {5:.3f}, rgb_loss = {6:.3f}, eikonal_loss = {7:.3f}, normal_loss = {8:.3f}, depth_loss = {9:.3f}, psnr = {10:.3f}'
                     .format(self.expname,
                             self.timestamp, epoch, data_index, self.n_batches,
                             loss.item(), loss_output['rgb_loss'].item(),
                             loss_output['eikonal_loss'].item(),
-                            loss_output['normal_loss'].item(), psnr.item()))
+                            loss_output['normal_loss'].item(),
+                            loss_output['depth_loss'].item(), psnr.item()))
 
                 self.train_dataset.change_sampling_idx(self.num_pixels)
                 self.scheduler.step()
@@ -301,7 +305,7 @@ class VolSDFTrainRunner():
 
         plot_data = {
             'rgb_gt': rgb_gt,
-            'normal_gt': normal_gt,
+            'normal_gt': (normal_gt + 1.0) / 2,
             'depth_gt': depth_gt,
             'pose': pose,
             'rgb_eval': rgb_eval,

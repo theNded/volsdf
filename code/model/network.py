@@ -256,7 +256,7 @@ class VolSDFNetwork(nn.Module):
         rgb_values = torch.sum(weights.unsqueeze(-1) * rgb, 1)
 
         # Rendered depth
-        depth_values = torch.sum(weights * z_vals)
+        depth_values = torch.sum(weights * z_vals, 1).unsqueeze(-1)
 
         # Rendered normal
         normals = gradients / gradients.norm(2, -1, keepdim=True)
@@ -265,6 +265,7 @@ class VolSDFNetwork(nn.Module):
 
         # white background assumption
         if self.white_bkgd:
+            print('White background')
             acc_map = torch.sum(weights, -1)
             rgb_values = rgb_values + (
                 1. - acc_map[..., None]) * self.bg_color.unsqueeze(0)
@@ -291,14 +292,6 @@ class VolSDFNetwork(nn.Module):
 
             grad_theta = self.implicit_network.gradient(eikonal_points)
             output['grad_theta'] = grad_theta
-
-        if not self.training:
-            gradients = gradients.detach()
-            normals = gradients / gradients.norm(2, -1, keepdim=True)
-            normals = normals.reshape(-1, N_samples, 3)
-            normal_map = torch.sum(weights.unsqueeze(-1) * normals, 1)
-
-            output['normal_map'] = normal_map
 
         return output
 

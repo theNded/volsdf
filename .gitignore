@@ -133,6 +133,7 @@ evals*
 data/DTU
 data/BlendedMVS
 data/scannet
+data/omnidtu
 
 code/.idea/
 .DS_Store
