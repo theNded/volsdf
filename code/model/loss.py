@@ -24,7 +24,6 @@ class VolSDFLoss(nn.Module):
         return rgb_loss
 
     def get_depth_loss(self, depth_values, depth_gt):
-        # print('depth', depth_values.shape, depth_gt.shape)
         depth_gt = depth_gt.reshape(-1, 1)
         with torch.no_grad():
             scales = (depth_values / depth_gt)

@@ -31,7 +31,12 @@ class SceneDataset(torch.utils.data.Dataset):
         image_paths = sorted(utils.glob_imgs(image_dir))
 
         depth_dir = '{0}/depth'.format(self.instance_dir)
+
+        png_flag = False
         depth_paths = sorted(glob.glob(os.path.join(depth_dir, '*.pfm')))
+        if len(depth_paths) != len(image_paths):
+            png_flag = True
+            depth_paths = sorted(glob.glob(os.path.join(depth_dir, '*.png')))
 
         normal_dir = '{0}/normal'.format(self.instance_dir)
         normal_paths = sorted(glob.glob(os.path.join(normal_dir, '*.npy')))
@@ -57,7 +62,7 @@ class SceneDataset(torch.utils.data.Dataset):
             P = world_mat @ scale_mat
             P = P[:3, :4]
             intrinsics, pose = rend_util.load_K_Rt_from_P(None, P)
-            # print(intrinsics)
+            print(intrinsics)
             self.intrinsics_all.append(torch.from_numpy(intrinsics).float())
             self.pose_all.append(torch.from_numpy(pose).float())
 
@@ -71,6 +76,12 @@ class SceneDataset(torch.utils.data.Dataset):
         for path in depth_paths:
             depth = cv2.imread(path, -1)
             depth = depth.flatten().astype(np.float32)
+            if png_flag:
+                depth *= 1e-3 * 0.3 # colmap scale
+                # import matplotlib.pyplot as plt
+                # plt.imshow(depth.reshape((384, 384)))
+                # plt.show()
+
             self.depth_images.append(
                 torch.from_numpy(depth).float().unsqueeze(-1))
 
