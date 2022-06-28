@@ -9,7 +9,7 @@ class VolSDFLoss(nn.Module):
                  rgb_loss,
                  eikonal_weight,
                  depth_weight=0.1,
-                 normal_weight=0.0):
+                 normal_weight=0.05):
         super().__init__()
         self.eikonal_weight = eikonal_weight
         self.depth_weight = depth_weight
@@ -18,11 +18,14 @@ class VolSDFLoss(nn.Module):
         self.rgb_loss = utils.get_class(rgb_loss)(reduction='mean')
 
     def get_rgb_loss(self, rgb_values, rgb_gt):
+        # print('rgb', rgb_values.shape, rgb_gt.shape)
         rgb_gt = rgb_gt.reshape(-1, 3)
         rgb_loss = self.rgb_loss(rgb_values, rgb_gt)
         return rgb_loss
 
     def get_depth_loss(self, depth_values, depth_gt):
+        # print('depth', depth_values.shape, depth_gt.shape)
+        depth_gt = depth_gt.reshape(-1, 1)
         with torch.no_grad():
             scales = (depth_values / depth_gt)
             mask = torch.isfinite(scales)
@@ -30,6 +33,8 @@ class VolSDFLoss(nn.Module):
         return ((depth_values - depth_gt * scale)**2).mean(), scale
 
     def get_normal_loss(self, normal_values, normal_gt):
+        # print('normal', normal_values.shape, normal_gt.shape)
+        normal_gt = normal_gt.reshape(-1, 3)
         l1_loss = (torch.abs(normal_values - normal_gt)).mean()
         dot_loss = torch.abs(
             (1 - (normal_values * normal_gt).sum(dim=1))).mean()
