@@ -8,6 +8,7 @@ from tqdm import tqdm
 import utils.general as utils
 import utils.plots as plt
 from utils import rend_util
+from torch.utils.tensorboard import SummaryWriter
 
 
 class VolSDFTrainRunner():
@@ -56,6 +57,7 @@ class VolSDFTrainRunner():
         self.timestamp = '{:%Y_%m_%d_%H_%M_%S}'.format(datetime.now())
         utils.mkdir_ifnotexists(os.path.join(self.expdir, self.timestamp))
 
+        self.writer = SummaryWriter(os.path.join(self.expdir, self.timestamp, 'tensorboard'))
         self.plots_dir = os.path.join(self.expdir, self.timestamp, 'plots')
         utils.mkdir_ifnotexists(self.plots_dir)
 
@@ -277,6 +279,19 @@ class VolSDFTrainRunner():
                 psnr = rend_util.get_psnr(
                     model_outputs['rgb_values'],
                     ground_truth['rgb'].cuda().reshape(-1, 3))
+
+                step = epoch * self.n_batches + data_index
+
+                self.writer.add_scalar('loss/total', loss.item(), step)
+                self.writer.add_scalar('loss/eikonal',
+                                       loss_output['eikonal_loss'].item(),
+                                       step)
+                self.writer.add_scalar('loss/normal',
+                                       loss_output['normal_loss'].item(), step)
+                self.writer.add_scalar('loss/depth',
+                                       loss_output['depth_loss'].item(), step)
+                self.writer.add_scalar('loss/rgb',
+                                       loss_output['rgb_loss'].item(), step)
                 print(
                     '{0}_{1} [{2}] ({3}/{4}): loss = {5:.3f}, rgb_loss = {6:.3f}, eikonal_loss = {7:.3f}, normal_loss = {8:.3f}, depth_loss = {9:.3f}, psnr = {10:.3f}'
                     .format(self.expname,
