@@ -57,7 +57,8 @@ class VolSDFTrainRunner():
         self.timestamp = '{:%Y_%m_%d_%H_%M_%S}'.format(datetime.now())
         utils.mkdir_ifnotexists(os.path.join(self.expdir, self.timestamp))
 
-        self.writer = SummaryWriter(os.path.join(self.expdir, self.timestamp, 'tensorboard'))
+        self.writer = SummaryWriter(
+            os.path.join(self.expdir, self.timestamp, 'tensorboard'))
         self.plots_dir = os.path.join(self.expdir, self.timestamp, 'plots')
         utils.mkdir_ifnotexists(self.plots_dir)
 
@@ -292,6 +293,7 @@ class VolSDFTrainRunner():
                                        loss_output['depth_loss'].item(), step)
                 self.writer.add_scalar('loss/rgb',
                                        loss_output['rgb_loss'].item(), step)
+                self.writer.add_scalar('psnr', psnr.item(), step)
                 print(
                     '{0}_{1} [{2}] ({3}/{4}): loss = {5:.3f}, rgb_loss = {6:.3f}, eikonal_loss = {7:.3f}, normal_loss = {8:.3f}, depth_loss = {9:.3f}, psnr = {10:.3f}'
                     .format(self.expname,

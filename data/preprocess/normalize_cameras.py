@@ -45,6 +45,8 @@ def normalize_cameras(intrinsic_dir, poses_dir, output_dir):
     normalization[1, 1] = max_radius / 3.0
     normalization[2, 2] = max_radius / 3.0
 
+    print(normalization)
+
     n_cameras = len(poses)
     cameras = {}
     cameras['scale'] = normalization
