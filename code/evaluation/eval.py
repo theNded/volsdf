@@ -99,27 +99,6 @@ def evaluate(**kwargs):
 
     model.eval()
 
-    with torch.no_grad():
-        mesh = plt.get_surface_high_res_mesh(
-            sdf=lambda x: model.implicit_network(x)[:, 0],
-            resolution=kwargs['resolution'],
-            grid_boundary=conf.get_list('plot.grid_boundary'),
-            level=conf.get_int('plot.level', default=0),
-            take_components=type(scan_id) is not str)
-
-        # Transform to world coordinates
-        mesh.apply_transform(scale_mat)
-
-        # Taking the biggest connected component
-        components = mesh.split(only_watertight=False)
-        areas = np.array([c.area for c in components], dtype=np.float32)
-        mesh_clean = components[areas.argmax()]
-
-        mesh_folder = '{0}/{1}'.format(evaldir, epoch)
-        utils.mkdir_ifnotexists(mesh_folder)
-        mesh_clean.export('{0}/scan{1}.ply'.format(mesh_folder, scan_id),
-                          'ply')
-
     if eval_rendering:
         images_dir = '{0}/rendering_{1}'.format(evaldir, epoch)
         utils.mkdir_ifnotexists(images_dir)
@@ -140,29 +119,61 @@ def evaluate(**kwargs):
                 out = model(s)
                 res.append({
                     'rgb_values': out['rgb_values'].detach(),
+                    'depth_values': out['depth_values'].detach(),
+                    'normal_values': out['normal_values'].detach(),
                 })
+                # Use this to free the graph(?)
+                out['depth_values'].sum().backward()
 
             batch_size = ground_truth['rgb'].shape[0]
             model_outputs = utils.merge_output(res, total_pixels, batch_size)
+
             rgb_eval = model_outputs['rgb_values']
             rgb_eval = rgb_eval.reshape(batch_size, total_pixels, 3)
-
             rgb_eval = plt.lin2img(rgb_eval, img_res).detach().cpu().numpy()[0]
             rgb_eval = rgb_eval.transpose(1, 2, 0)
             img = Image.fromarray((rgb_eval * 255).astype(np.uint8))
-            img.save('{0}/eval_{1}.png'.format(images_dir,
-                                               '%03d' % indices[0]))
+            img.save('{0}/{1}_rgb.png'.format(images_dir, '%03d' % indices[0]))
 
-            psnr = rend_util.get_psnr(
-                model_outputs['rgb_values'],
-                ground_truth['rgb'].cuda().reshape(-1, 3)).item()
-            psnrs.append(psnr)
+            depth_eval = model_outputs['depth_values']
+            depth_eval = depth_eval.reshape(batch_size, total_pixels, 1)
+            depth_eval = plt.lin2img(depth_eval,
+                                     img_res).detach().cpu().numpy()[0]
+            print(depth_eval.shape)
+            np.save(
+                '{0}/{1}_depth.npy'.format(images_dir, '%03d' % indices[0]),
+                depth_eval)
 
-        psnrs = np.array(psnrs).astype(np.float64)
-        print("RENDERING EVALUATION {2}: psnr mean = {0} ; psnr std = {1}".
-              format("%.2f" % psnrs.mean(), "%.2f" % psnrs.std(), scan_id))
-        psnrs = np.concatenate([psnrs, psnrs.mean()[None], psnrs.std()[None]])
-        pd.DataFrame(psnrs).to_csv('{0}/psnr_{1}.csv'.format(evaldir, epoch))
+            normal_eval = model_outputs['normal_values']
+            normal_eval = normal_eval.reshape(batch_size, total_pixels, 3)
+            normal_eval = plt.lin2img(normal_eval,
+                                      img_res).detach().cpu().numpy()[0]
+            print(normal_eval.shape)
+            np.save(
+                '{0}/{1}_normal.npy'.format(images_dir, '%03d' % indices[0]),
+                normal_eval)
+
+
+    with torch.no_grad():
+        mesh = plt.get_surface_high_res_mesh(
+            sdf=lambda x: model.implicit_network(x)[:, 0],
+            resolution=kwargs['resolution'],
+            grid_boundary=conf.get_list('plot.grid_boundary'),
+            level=conf.get_int('plot.level', default=0),
+            take_components=type(scan_id) is not str)
+
+        # Transform to world coordinates
+        mesh.apply_transform(scale_mat)
+
+        # Taking the biggest connected component
+        components = mesh.split(only_watertight=False)
+        areas = np.array([c.area for c in components], dtype=np.float32)
+        mesh_clean = components[areas.argmax()]
+
+        mesh_folder = '{0}/{1}'.format(evaldir, epoch)
+        utils.mkdir_ifnotexists(mesh_folder)
+        mesh_clean.export('{0}/scan{1}.ply'.format(mesh_folder, scan_id),
+                          'ply')
 
 
 if __name__ == '__main__':
