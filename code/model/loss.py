@@ -25,6 +25,8 @@ class VolSDFLoss(nn.Module):
 
     def get_depth_loss(self, depth_values, depth_gt):
         depth_gt = depth_gt.reshape(-1, 1)
+
+        # TODO: replace with least squares
         with torch.no_grad():
             scales = (depth_values / depth_gt)
             mask = torch.isfinite(scales)

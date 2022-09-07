@@ -8,6 +8,7 @@ from tqdm import tqdm
 import utils.general as utils
 import utils.plots as plt
 from utils import rend_util
+from torch.utils.tensorboard import SummaryWriter
 
 
 class VolSDFTrainRunner():
@@ -24,11 +25,7 @@ class VolSDFTrainRunner():
 
         self.expname = self.conf.get_string(
             'train.expname') + kwargs['expname']
-        scan_id = kwargs[
-            'scan_id'] if kwargs['scan_id'] != -1 else self.conf.get_int(
-                'dataset.scan_id', default=-1)
-        if scan_id != -1:
-            self.expname = self.expname + '_{0}'.format(scan_id)
+        self.expname = self.expname + '_{0}'.format(kwargs['scan_id'])
 
         if kwargs['is_continue'] and kwargs['timestamp'] == 'latest':
             if os.path.exists(
@@ -56,6 +53,8 @@ class VolSDFTrainRunner():
         self.timestamp = '{:%Y_%m_%d_%H_%M_%S}'.format(datetime.now())
         utils.mkdir_ifnotexists(os.path.join(self.expdir, self.timestamp))
 
+        self.writer = SummaryWriter(
+            os.path.join(self.expdir, self.timestamp, 'tensorboard'))
         self.plots_dir = os.path.join(self.expdir, self.timestamp, 'plots')
         utils.mkdir_ifnotexists(self.plots_dir)
 
@@ -84,19 +83,16 @@ class VolSDFTrainRunner():
         print('shell command : {0}'.format(' '.join(sys.argv)))
 
         print('Loading data ...')
-
         dataset_conf = self.conf.get_config('dataset')
-        if kwargs['scan_id'] != -1:
-            dataset_conf['scan_id'] = kwargs['scan_id']
+        dataset_conf['scan_id'] = kwargs['scan_id']
+        dataset_conf['data_dir'] = kwargs['data_dir']
 
         self.train_dataset = utils.get_class(
             self.conf.get_string('train.dataset_class'))(**dataset_conf)
 
         self.ds_len = len(self.train_dataset)
         print('Finish loading data. Data-set size: {0}'.format(self.ds_len))
-        if scan_id < 24 and scan_id > 0:  # BlendedMVS, running for 200k iterations
-            self.nepochs = int(200000 / self.ds_len)
-            print('RUNNING FOR {0}'.format(self.nepochs))
+        print('Running {0} epochs'.format(self.nepochs))
 
         self.train_dataloader = torch.utils.data.DataLoader(
             self.train_dataset,
@@ -277,6 +273,21 @@ class VolSDFTrainRunner():
                 psnr = rend_util.get_psnr(
                     model_outputs['rgb_values'],
                     ground_truth['rgb'].cuda().reshape(-1, 3))
+
+                step = epoch * self.n_batches + data_index
+
+                self.writer.add_scalar('loss/total', loss.item(), step)
+                self.writer.add_scalar('loss/eikonal',
+                                       loss_output['eikonal_loss'].item(),
+                                       step)
+                self.writer.add_scalar('loss/normal',
+                                       loss_output['normal_loss'].item(), step)
+                self.writer.add_scalar('loss/depth',
+                                       loss_output['depth_loss'].item(), step)
+                self.writer.add_scalar('loss/rgb',
+                                       loss_output['rgb_loss'].item(), step)
+                self.writer.add_scalar('psnr', psnr.item(), step)
+
                 print(
                     '{0}_{1} [{2}] ({3}/{4}): loss = {5:.3f}, rgb_loss = {6:.3f}, eikonal_loss = {7:.3f}, normal_loss = {8:.3f}, depth_loss = {9:.3f}, psnr = {10:.3f}'
                     .format(self.expname,

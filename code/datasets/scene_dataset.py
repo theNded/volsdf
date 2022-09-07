@@ -16,8 +16,7 @@ class SceneDataset(torch.utils.data.Dataset):
         scan_id=0,
     ):
 
-        self.instance_dir = os.path.join('../data', data_dir,
-                                         'scan{0}'.format(scan_id))
+        self.instance_dir = data_dir
         print(self.instance_dir)
 
         self.total_pixels = img_res[0] * img_res[1]
@@ -27,18 +26,18 @@ class SceneDataset(torch.utils.data.Dataset):
 
         self.sampling_idx = None
 
-        image_dir = '{0}/image'.format(self.instance_dir)
+        image_dir = '{0}/omni_image'.format(self.instance_dir)
         image_paths = sorted(utils.glob_imgs(image_dir))
 
-        depth_dir = '{0}/depth'.format(self.instance_dir)
+        depth_dir = '{0}/omni_depth'.format(self.instance_dir)
 
         png_flag = False
         depth_paths = sorted(glob.glob(os.path.join(depth_dir, '*.pfm')))
         if len(depth_paths) != len(image_paths):
             png_flag = True
-            depth_paths = sorted(glob.glob(os.path.join(depth_dir, '*.png')))
+            depth_paths = sorted(glob.glob(os.path.join(depth_dir, '*.npy')))
 
-        normal_dir = '{0}/normal'.format(self.instance_dir)
+        normal_dir = '{0}/omni_normal'.format(self.instance_dir)
         normal_paths = sorted(glob.glob(os.path.join(normal_dir, '*.npy')))
 
         self.n_images = len(image_paths)
@@ -47,24 +46,20 @@ class SceneDataset(torch.utils.data.Dataset):
 
         self.cam_file = '{0}/cameras.npz'.format(self.instance_dir)
         camera_dict = np.load(self.cam_file)
-        scale_mats = [
-            camera_dict['scale_mat_%d' % idx].astype(np.float32)
-            for idx in range(self.n_images)
-        ]
-        world_mats = [
-            camera_dict['world_mat_%d' % idx].astype(np.float32)
+
+        scale_mat = camera_dict['scale'].astype(np.float32)
+        intrinsic_mat = camera_dict['intrinsic'].astype(np.float32)
+        pose_mats = [
+            camera_dict['pose_%d' % idx].astype(np.float32)
             for idx in range(self.n_images)
         ]
 
-        self.intrinsics_all = []
+        self.intrinsic = torch.from_numpy(intrinsic_mat)
         self.pose_all = []
-        for scale_mat, world_mat in zip(scale_mats, world_mats):
-            P = world_mat @ scale_mat
-            P = P[:3, :4]
-            intrinsics, pose = rend_util.load_K_Rt_from_P(None, P)
-            print(intrinsics)
-            self.intrinsics_all.append(torch.from_numpy(intrinsics).float())
-            self.pose_all.append(torch.from_numpy(pose).float())
+
+        inv_scale = np.linalg.inv(scale_mat).astype(np.float32)
+        for pose in pose_mats:
+            self.pose_all.append(torch.from_numpy(inv_scale @ pose).float())
 
         self.rgb_images = []
         for path in image_paths:
@@ -74,14 +69,8 @@ class SceneDataset(torch.utils.data.Dataset):
 
         self.depth_images = []
         for path in depth_paths:
-            depth = cv2.imread(path, -1)
+            depth = np.load(path)
             depth = depth.flatten().astype(np.float32)
-            if png_flag:
-                depth *= 1e-3 * 0.3 # colmap scale
-                # import matplotlib.pyplot as plt
-                # plt.imshow(depth.reshape((384, 384)))
-                # plt.show()
-
             self.depth_images.append(
                 torch.from_numpy(depth).float().unsqueeze(-1))
 
@@ -113,7 +102,7 @@ class SceneDataset(torch.utils.data.Dataset):
 
         sample = {
             "uv": uv,
-            "intrinsics": self.intrinsics_all[idx],
+            "intrinsics": self.intrinsic,
             "pose": self.pose_all[idx]
         }
 
@@ -157,4 +146,4 @@ class SceneDataset(torch.utils.data.Dataset):
                 self.total_pixels)[:sampling_size]
 
     def get_scale_mat(self):
-        return np.load(self.cam_file)['scale_mat_0']
+        return np.load(self.cam_file)['scale']
