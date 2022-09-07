@@ -196,6 +196,8 @@ def get_surface_high_res_mesh(sdf,
 
     z = z.astype(np.float32)
 
+    import ipdb
+    ipdb.set_trace()
     verts, faces, normals, values = measure.marching_cubes(
         volume=z.reshape(grid['xyz'][1].shape[0], grid['xyz'][0].shape[0],
                          grid['xyz'][2].shape[0]).transpose([1, 0, 2]),
@@ -461,7 +463,8 @@ def get_grid(points, resolution, input_min=None, input_max=None, eps=0.1):
                       input_max[1] + length / (z.shape[0] - 1) + eps,
                       length / (z.shape[0] - 1))
 
-    xx, yy, zz = np.meshgrid(x, y, z)
+    xx, yy, zz = np.meshgrid(x.astype(np.float32), y.astype(np.float32),
+                             z.astype(np.float32))
     grid_points = torch.tensor(np.vstack([xx.ravel(),
                                           yy.ravel(),
                                           zz.ravel()]).T,
