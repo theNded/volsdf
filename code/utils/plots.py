@@ -18,6 +18,7 @@ def plot(implicit_network, indices, plot_data, path, epoch, img_res, plot_nimgs,
 
         plot_images(plot_data['rgb_eval'], plot_data['rgb_gt'], path, epoch, plot_nimgs, img_res)
 
+        plot_npy(plot_data['depth_eval'], plot_data['normal_map'], path, epoch, img_res)
         # plot normal maps
         plot_normal_maps(plot_data['normal_map'], path, epoch, plot_nimgs, img_res)
 
@@ -377,6 +378,14 @@ def plot_normal_maps(normal_maps, path, epoch, plot_nrow, img_res):
 
     img = Image.fromarray(tensor)
     img.save('{0}/normal_{1}.png'.format(path, epoch))
+
+
+def plot_npy(depth_maps, normal_maps, path, epoch, img_res):
+    depth_maps = lin2img(depth_maps, img_res)
+    np.save('{0}/depth_{1}.npy'.format(path, epoch), depth_maps.detach().cpu().numpy())
+
+    normal_maps = lin2img(normal_maps, img_res)
+    np.save('{0}/normal_{1}.npy'.format(path, epoch), normal_maps.detach().cpu().numpy())
 
 
 def plot_images(rgb_points, ground_true, path, epoch, plot_nrow, img_res):

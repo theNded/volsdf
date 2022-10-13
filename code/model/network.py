@@ -230,6 +230,11 @@ class VolSDFNetwork(nn.Module):
         weights = self.volume_rendering(z_vals, sdf)
 
         rgb_values = torch.sum(weights.unsqueeze(-1) * rgb, 1)
+        depth_values = torch.sum(weights * z_vals, 1, keepdims=True) / (weights.sum(dim=1, keepdims=True) +1e-8)
+        ray_dirs_tmp, _ = rend_util.get_camera_params(uv, torch.eye(4).to(pose.device)[None], intrinsics)
+        depth_scale = ray_dirs_tmp[0, :, 2:]
+
+        depth_values = depth_scale * depth_values
 
         # white background assumption
         if self.white_bkgd:
@@ -238,6 +243,7 @@ class VolSDFNetwork(nn.Module):
 
         output = {
             'rgb_values': rgb_values,
+            'depth_values': depth_values
         }
 
         if self.training:

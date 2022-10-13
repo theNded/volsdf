@@ -175,7 +175,9 @@ class VolSDFTrainRunner():
                 for s in tqdm(split):
                     out = self.model(s)
                     d = {'rgb_values': out['rgb_values'].detach(),
-                         'normal_map': out['normal_map'].detach()}
+                         'normal_map': out['normal_map'].detach(),
+                         'depth_values': out['depth_values'].detach()
+                    }
                     res.append(d)
 
                 batch_size = ground_truth['rgb'].shape[0]
@@ -227,6 +229,7 @@ class VolSDFTrainRunner():
         batch_size, num_samples, _ = rgb_gt.shape
 
         rgb_eval = model_outputs['rgb_values'].reshape(batch_size, num_samples, 3)
+        depth_eval = model_outputs['depth_values'].reshape(batch_size, num_samples, 1)
         normal_map = model_outputs['normal_map'].reshape(batch_size, num_samples, 3)
         normal_map = (normal_map + 1.) / 2.
 
@@ -234,6 +237,7 @@ class VolSDFTrainRunner():
             'rgb_gt': rgb_gt,
             'pose': pose,
             'rgb_eval': rgb_eval,
+            'depth_eval': depth_eval,
             'normal_map': normal_map,
         }
 

@@ -24,11 +24,7 @@ def evaluate(**kwargs):
     eval_rendering = kwargs['eval_rendering']
 
     expname = conf.get_string('train.expname') + kwargs['expname']
-    scan_id = kwargs['scan_id'] if kwargs['scan_id'] != -1 else conf.get_int('dataset.scan_id', default=-1)
-    if scan_id != -1:
-        expname = expname + '_{0}'.format(scan_id)
-    else:
-        scan_id = conf.get_string('dataset.object', default='')
+    scan_id = kwargs['scan_id']
 
     if kwargs['timestamp'] == 'latest':
         if os.path.exists(os.path.join('../', kwargs['exps_folder_name'], expname)):
@@ -57,8 +53,8 @@ def evaluate(**kwargs):
     utils.mkdir_ifnotexists(evaldir)
 
     dataset_conf = conf.get_config('dataset')
-    if kwargs['scan_id'] != -1:
-        dataset_conf['scan_id'] = kwargs['scan_id']
+    dataset_conf['scan_id'] = kwargs['scan_id']
+    dataset_conf['data_dir'] = kwargs['data_dir']
     eval_dataset = utils.get_class(conf.get_string('train.dataset_class'))(**dataset_conf)
 
     conf_model = conf.get_config('model')
@@ -92,25 +88,14 @@ def evaluate(**kwargs):
 
     with torch.no_grad():
 
-        if scan_id < 24: # Blended MVS
-            mesh = plt.get_surface_high_res_mesh(
-                sdf=lambda x: model.implicit_network(x)[:, 0],
-                resolution=kwargs['resolution'],
-                grid_boundary=conf.get_list('plot.grid_boundary'),
-                level=conf.get_int('plot.level', default=0),
-                take_components = type(scan_id) is not str
-            )
-        else: # DTU
-            bb_dict = np.load('../data/DTU/bbs.npz')
-            grid_params = bb_dict[str(scan_id)]
 
-            mesh = plt.get_surface_by_grid(
-                grid_params=grid_params,
-                sdf=lambda x: model.implicit_network(x)[:, 0],
-                resolution=kwargs['resolution'],
-                level=conf.get_int('plot.level', default=0),
-                higher_res=True
-            )
+        mesh = plt.get_surface_high_res_mesh(
+            sdf=lambda x: model.implicit_network(x)[:, 0],
+            resolution=kwargs['resolution'],
+            grid_boundary=conf.get_list('plot.grid_boundary'),
+            level=conf.get_int('plot.level', default=0),
+            take_components = type(scan_id) is not str
+        )
 
         # Transform to world coordinates
         mesh.apply_transform(scale_mat)
@@ -168,7 +153,7 @@ def evaluate(**kwargs):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-
+    parser.add_argument('--data_dir', required=True)
     parser.add_argument('--conf', type=str, default='./confs/dtu.conf')
     parser.add_argument('--expname', type=str, default='', help='The experiment name to be evaluated.')
     parser.add_argument('--exps_folder', type=str, default='exps', help='The experiments folder name.')
@@ -176,7 +161,7 @@ if __name__ == '__main__':
     parser.add_argument('--gpu', type=str, default='auto', help='GPU to use [default: GPU auto]')
     parser.add_argument('--timestamp', default='latest', type=str, help='The experiemnt timestamp to test.')
     parser.add_argument('--checkpoint', default='latest',type=str,help='The trained model checkpoint to test')
-    parser.add_argument('--scan_id', type=int, default=-1, help='If set, taken to be the scan id.')
+    parser.add_argument('--scan_id', type=str, help='If set, taken to be the scan id.')
     parser.add_argument('--resolution', default=512, type=int, help='Grid resolution for marching cube')
     parser.add_argument('--eval_rendering', default=False, action="store_true", help='If set, evaluate rendering quality.')
 
@@ -197,6 +182,7 @@ if __name__ == '__main__':
              evals_folder_name=opt.evals_folder,
              timestamp=opt.timestamp,
              checkpoint=opt.checkpoint,
+             data_dir=opts.data_dir,
              scan_id=opt.scan_id,
              resolution=opt.resolution,
              eval_rendering=opt.eval_rendering,
