@@ -13,7 +13,7 @@ class SceneDataset(torch.utils.data.Dataset):
                  scan_id=0,
                  ):
 
-        self.instance_dir = os.path.join('../data', data_dir, 'scan{0}'.format(scan_id))
+        self.instance_dir = data_dir
 
         self.total_pixels = img_res[0] * img_res[1]
         self.img_res = img_res
@@ -22,7 +22,7 @@ class SceneDataset(torch.utils.data.Dataset):
 
         self.sampling_idx = None
 
-        image_dir = '{0}/image'.format(self.instance_dir)
+        image_dir = '{0}/omni_image'.format(self.instance_dir)
         image_paths = sorted(utils.glob_imgs(image_dir))
         self.n_images = len(image_paths)
 

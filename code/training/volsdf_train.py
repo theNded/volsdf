@@ -21,9 +21,8 @@ class VolSDFTrainRunner():
         self.GPU_INDEX = kwargs['gpu_index']
 
         self.expname = self.conf.get_string('train.expname') + kwargs['expname']
-        scan_id = kwargs['scan_id'] if kwargs['scan_id'] != -1 else self.conf.get_int('dataset.scan_id', default=-1)
-        if scan_id != -1:
-            self.expname = self.expname + '_{0}'.format(scan_id)
+        scan_id = kwargs['scan_id']
+        self.expname = self.expname + '_{}'.format(scan_id)
 
         if kwargs['is_continue'] and kwargs['timestamp'] == 'latest':
             if os.path.exists(os.path.join('../',kwargs['exps_folder_name'],self.expname)):
@@ -71,17 +70,13 @@ class VolSDFTrainRunner():
         print('Loading data ...')
 
         dataset_conf = self.conf.get_config('dataset')
-        if kwargs['scan_id'] != -1:
-            dataset_conf['scan_id'] = kwargs['scan_id']
+        dataset_conf['scan_id'] = kwargs['scan_id']
+        dataset_conf['data_dir'] = kwargs['data_dir']
 
         self.train_dataset = utils.get_class(self.conf.get_string('train.dataset_class'))(**dataset_conf)
 
         self.ds_len = len(self.train_dataset)
         print('Finish loading data. Data-set size: {0}'.format(self.ds_len))
-        if scan_id < 24 and scan_id > 0: # BlendedMVS, running for 200k iterations
-            self.nepochs = int(200000 / self.ds_len)
-            print('RUNNING FOR {0}'.format(self.nepochs))
-
         self.train_dataloader = torch.utils.data.DataLoader(self.train_dataset,
                                                             batch_size=self.batch_size,
                                                             shuffle=True,
