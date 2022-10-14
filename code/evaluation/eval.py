@@ -25,6 +25,8 @@ def evaluate(**kwargs):
 
     expname = conf.get_string('train.expname') + kwargs['expname']
     scan_id = kwargs['scan_id']
+    expname = expname + '_{}'.format(scan_id)
+
 
     if kwargs['timestamp'] == 'latest':
         if os.path.exists(os.path.join('../', kwargs['exps_folder_name'], expname)):
@@ -182,7 +184,7 @@ if __name__ == '__main__':
              evals_folder_name=opt.evals_folder,
              timestamp=opt.timestamp,
              checkpoint=opt.checkpoint,
-             data_dir=opts.data_dir,
+             data_dir=opt.data_dir,
              scan_id=opt.scan_id,
              resolution=opt.resolution,
              eval_rendering=opt.eval_rendering,
