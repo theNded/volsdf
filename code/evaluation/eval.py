@@ -66,6 +66,7 @@ def evaluate(**kwargs):
 
     # settings for camera optimization
     scale_mat = eval_dataset.get_scale_mat()
+    print(scale_mat)
 
     if eval_rendering:
         eval_dataloader = torch.utils.data.DataLoader(eval_dataset,
@@ -89,8 +90,6 @@ def evaluate(**kwargs):
     model.eval()
 
     with torch.no_grad():
-
-
         mesh = plt.get_surface_high_res_mesh(
             sdf=lambda x: model.implicit_network(x)[:, 0],
             resolution=kwargs['resolution'],
@@ -128,17 +127,32 @@ def evaluate(**kwargs):
                 out = model(s)
                 res.append({
                     'rgb_values': out['rgb_values'].detach(),
+                    'depth_values': out['depth_values'].detach(),
+                    'normal_map': out['normal_map'].detach()
                 })
 
             batch_size = ground_truth['rgb'].shape[0]
             model_outputs = utils.merge_output(res, total_pixels, batch_size)
+
             rgb_eval = model_outputs['rgb_values']
             rgb_eval = rgb_eval.reshape(batch_size, total_pixels, 3)
-
             rgb_eval = plt.lin2img(rgb_eval, img_res).detach().cpu().numpy()[0]
             rgb_eval = rgb_eval.transpose(1, 2, 0)
             img = Image.fromarray((rgb_eval * 255).astype(np.uint8))
             img.save('{0}/eval_{1}.png'.format(images_dir,'%03d' % indices[0]))
+
+            depth_eval = model_outputs['depth_values']
+            depth_eval = depth_eval.reshape(batch_size, total_pixels, 1)
+            depth_eval = plt.lin2img(depth_eval, img_res).detach().cpu().numpy()[0]
+            depth_eval = depth_eval.squeeze()
+            np.save('{0}/depth_{1}.npy'.format(images_dir,'%03d' % indices[0]), depth_eval * scale_mat[0][0])
+
+
+            normal_eval = model_outputs['normal_map']
+            normal_eval = normal_eval.reshape(batch_size, total_pixels, 3)
+            normal_eval = plt.lin2img(normal_eval, img_res).detach().cpu().numpy()[0]
+            normal_eval = normal_eval.transpose(1, 2, 0)
+            np.save('{0}/normal_{1}.npy'.format(images_dir,'%03d' % indices[0]), normal_eval)
 
             psnr = rend_util.get_psnr(model_outputs['rgb_values'],
                                       ground_truth['rgb'].cuda().reshape(-1, 3)).item()
