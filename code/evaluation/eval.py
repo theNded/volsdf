@@ -147,7 +147,6 @@ def evaluate(**kwargs):
             depth_eval = depth_eval.squeeze()
             np.save('{0}/depth_{1}.npy'.format(images_dir,'%03d' % indices[0]), depth_eval * scale_mat[0][0])
 
-
             normal_eval = model_outputs['normal_map']
             normal_eval = normal_eval.reshape(batch_size, total_pixels, 3)
             normal_eval = plt.lin2img(normal_eval, img_res).detach().cpu().numpy()[0]
